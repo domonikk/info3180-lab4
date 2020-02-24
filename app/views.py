@@ -7,7 +7,9 @@ This file creates your application.
 import os
 from app import app
 from flask import render_template, request, redirect, url_for, flash, session, abort
-from werkzeug.utils import secure_filename
+from app.forms import UploadForm
+from werkzeug.utils import secure_filename 
+
 
 
 ###
@@ -16,31 +18,41 @@ from werkzeug.utils import secure_filename
 
 @app.route('/')
 def home():
-    """Render website's home page."""
+    """Render website's home page.""" 
     return render_template('home.html')
 
 
 @app.route('/about/')
 def about():
-    """Render the website's about page."""
+    """Render the website's about page.""" 
     return render_template('about.html', name="Mary Jane")
 
 
 @app.route('/upload', methods=['POST', 'GET'])
 def upload():
     if not session.get('logged_in'):
-        abort(401)
-
+        abort(401) 
+        
     # Instantiate your form class
+    form = UploadForm() 
+    
 
-    # Validate file upload on submit
-    if request.method == 'POST':
-        # Get file data and save to your uploads folder
-
-        flash('File Saved', 'success')
-        return redirect(url_for('home'))
-
-    return render_template('upload.html')
+    # Validate file upload on submit 
+    if request.method == 'POST' and form.validate_on_submit(): 
+        # Get file data and save to your uploads folder 
+        photo = form.photo.data 
+         
+        filename = secure_filename(photo.filename)  
+        photo.save (os.path.join(app.config['UPLOAD_FOLDER'],filename))   
+         
+        flash('File Saved', 'success') 
+        return redirect(url_for('home')) 
+    flash_errors(form)
+    return render_template('upload.html', form=form) 
+    
+@app.route('/files') 
+def files():
+    return render_template('files.html', images= get_upload_images())
 
 
 @app.route('/login', methods=['POST', 'GET'])
@@ -72,10 +84,20 @@ def logout():
 def flash_errors(form):
     for field, errors in form.errors.items():
         for error in errors:
-            flash(u"Error in the %s field - %s" % (
-                getattr(form, field).label.text,
-                error
-), 'danger')
+            flash("Error in the {} field - {}".format(
+                getattr(form, field).label.text,error), 'danger')  
+                
+                
+def get_upload_images():
+    images = []
+
+    rootdir = app.config['UPLOAD_FOLDER']
+    for subdir, dirs, files in os.walk(rootdir):
+        files = [f for f in files if not f[0] == '.'] 
+        for file in files:
+            folder = os.path.splitext(os.path.basename(subdir))[0]
+            images.append(os.path.join(folder, file))
+    return images
 
 @app.route('/<file_name>.txt')
 def send_text_file(file_name):
